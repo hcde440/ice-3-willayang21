@@ -104,7 +104,7 @@ void loop() {
   celsius_MPL = mpl115a2.getTemperature();  
   Serial.print("Reading from MPL: "); Serial.print(celsius_MPL, 1); Serial.println(" *C");
 
-  // save the read from MPL to Adafruit IO
+  // save the reading from MPL to Adafruit IO
   temp_MPL->save(celsius_MPL);
 
   // print them to the OLED
