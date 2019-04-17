@@ -1,5 +1,5 @@
-// Adafruit IO Temperature & Humidity Example
-// Tutorial Link: https://learn.adafruit.com/adafruit-io-basics-temperature-and-humidity
+// Adafruit IO temp_DHT & Humidity Example
+// Tutorial Link: https://learn.adafruit.com/adafruit-io-basics-temp_DHT-and-humidity
 //
 // Adafruit invests time and resources providing this open source code.
 // Please support Adafruit and open source hardware by purchasing
@@ -11,11 +11,13 @@
 //
 // All text above must be included in any redistribution.
 
+
+// Both DHT22 and the MPL115A2 can measure temperature,
+// This sketch uses DHT22 and the MPL115A2 to sense and compare temperature 
+// readings from the two sensors and outputs the result to OLED and Adafruit IO
+// https://io.adafruit.com/willayang/dashboards/ice3
 /************************** Configuration ***********************************/
 
-// edit the config.h tab and enter your Adafruit IO credentials
-// and any additional configuration needed for WiFi, cellular,
-// or ethernet clients.
 #include "config.h"
 
 /************************ Example Starts Here *******************************/
@@ -23,6 +25,11 @@
 #include <DHT.h>
 #include <DHT_U.h>
 #include <Adafruit_SSD1306.h>
+#include <Wire.h>
+#include <Adafruit_MPL115A2.h>
+
+// initialize mpl115a2 sensor
+Adafruit_MPL115A2 mpl115a2;
 
 // oled display
 Adafruit_SSD1306 oled = Adafruit_SSD1306(128, 32, &Wire);
@@ -33,13 +40,15 @@ Adafruit_SSD1306 oled = Adafruit_SSD1306(128, 32, &Wire);
 // create DHT22 instance
 DHT_Unified dht(DATA_PIN, DHT22);
 
-// set up the 'temperature' and 'humidity' feeds
-AdafruitIO_Feed *temperature = io.feed("temperature");
-AdafruitIO_Feed *humidity = io.feed("humidity");
+// set up the 'temp_DHT' and 'humidity' feeds
+AdafruitIO_Feed *temp_DHT = io.feed("temp_DHT");
+AdafruitIO_Feed *temp_MPL = io.feed("temp_MPL");
 
 void setup() {
+  
+  mpl115a2.begin(); //  starts sensing pressure
   oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x32)
-  oled.display();
+  oled.display(); // make the screen display
 
   // start the serial connection
   Serial.begin(115200);
@@ -76,47 +85,37 @@ void loop() {
   // function. it keeps the client connected to
   // io.adafruit.com, and processes any incoming data.
   io.run();
-
+  
+  // Get temp_DHT event and print its value
   sensors_event_t event;
   dht.temperature().getEvent(&event);
 
   float celsius = event.temperature;
-  float fahrenheit = (celsius * 1.8) + 32;
 
-  Serial.print("celsius: ");
+  Serial.print("Reading from DHT: ");
   Serial.print(celsius);
-  Serial.println("C");
-
-  Serial.print("fahrenheit: ");
-  Serial.print(fahrenheit);
-  Serial.println("F");
+  Serial.println(" *C");
 
   // save fahrenheit (or celsius) to Adafruit IO
-  temperature->save(fahrenheit);
+  temp_DHT->save(celsius);
+  
+  float celsius_MPL = 0;    
 
-  dht.humidity().getEvent(&event);
-   
-  Serial.print("humidity: ");
-  Serial.print(event.relative_humidity);
-  Serial.println("%");
+  celsius_MPL = mpl115a2.getTemperature();  
+  Serial.print("Reading from MPL: "); Serial.print(celsius_MPL, 1); Serial.println(" *C");
 
-  // save humidity to Adafruit IO
-  humidity->save(event.relative_humidity);
+  // save the read from MPL to Adafruit IO
+  temp_MPL->save(celsius_MPL);
 
-  // print it to the OLED
-  oled.clearDisplay();
-  oled.setCursor(0,0);
-  oled.print("Temp: "); oled.print(fahrenheit,0); oled.print(" *F ");
-  oled.print("Hum: "); oled.print(event.relative_humidity,0); oled.println(" %");
-  Serial.print("Status: "); Serial.println(aio_status);
-  switch (aio_status) {
-     case AIO_IDLE:  oled.println("IDLE"); break;
-     case AIO_DISCONNECTED:
-     case AIO_NET_DISCONNECTED:  oled.println("DISCONNECT"); break;
-     case AIO_NET_CONNECTED:
-     case AIO_CONNECTED_INSECURE:
-     case AIO_CONNECTED: oled.println("CONNECTED"); break;
-  }
+  // print them to the OLED
+  oled.clearDisplay(); // clear display
+  oled.setCursor(0,0); // set cursor
+
+  // print temperature reading from DHT
+  oled.print("DHT Temp: "); oled.print(celsius,0); oled.println(" *C ");
+
+  // print temperature reading from MPL, which is a little different
+  oled.print("MPL Temp: "); oled.print(celsius_MPL,0); oled.println(" *C ");
   oled.display();
 
   // wait 5 seconds (5000 milliseconds == 5 seconds)
